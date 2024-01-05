@@ -1,0 +1,8 @@
+version: '3'
+services:
+  api-proxy:
+    image: obeoneorg/simple-cors-proxy
+    container_name: api-proxy
+    restart: always
+    ports:
+      - "127.0.0.1:8180:8080"

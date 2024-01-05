@@ -28,8 +28,18 @@ You can use the Docker image to quickly run the proxy server. Here's how:
 
 2. Run the Docker container:
    ```
-   docker run -p 8080:8080 obeoneorg/simple-cors-proxy
+   docker run -d --name simple-cors-proxy  -p 8080:8080 obeoneorg/simple-cors-proxy
    ```
+
+## 🐳 Docker Compose
+
+You can use the Docker Compose file to quickly run the proxy server. Here's how:
+
+1. Run the Docker Compose file:
+   ```
+   docker compose up -d
+   ```
+
 
 ## 💻 Usage
 
