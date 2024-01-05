@@ -1,0 +1,15 @@
+{
+  "name": "cors-proxy",
+  "version": "1.0.0",
+  "description": "A simple CORS proxy server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "morgan": "^1.10.0",
+    "express": "^4.17.1",
+    "http-proxy-middleware": "^1.0.6"
+  }
+}
