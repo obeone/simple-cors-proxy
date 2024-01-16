@@ -22,23 +22,26 @@ To use the TypingMind plugin, simply install go to the [TypingMind Plugin page](
 You can use the Docker image to quickly run the proxy server. Here's how:
 
 1. Pull the Docker image:
-   ```
-   docker pull obeoneorg/simple-cors-proxy
-   ```
+
+```shell
+docker pull obeoneorg/simple-cors-proxy
+```
 
 2. Run the Docker container:
-   ```
-   docker run -d --name simple-cors-proxy  -p 8080:8080 obeoneorg/simple-cors-proxy
-   ```
+
+```shell
+docker run -d --name simple-cors-proxy  -p 8080:8080 obeoneorg/simple-cors-proxy
+```
 
 ## 🐳 Docker Compose
 
 You can use the Docker Compose file to quickly run the proxy server. Here's how:
 
 1. Run the Docker Compose file:
-   ```
-   docker compose up -d
-   ```
+
+```shell
+docker compose up -d
+```
 
 
 ## 💻 Usage
@@ -46,21 +49,38 @@ You can use the Docker Compose file to quickly run the proxy server. Here's how:
 To use this proxy server without Docker, follow these steps:
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/obeone/simple-cors-proxy.git
-   ```
+
+```shell
+git clone https://github.com/obeone/simple-cors-proxy.git
+```
 
 2. Install the dependencies:
-   ```
-   npm install
-   ```
+
+```shell
+npm install
+```
 
 3. Start the server:
-   ```
-   npm start
-   ```
+
+```shell
+npm start
+```
 
 4. The server will be running on port 8080 by default. You can change the port by setting the `PORT` environment variable.
+
+### Advanced Usage
+
+If you need to remove some headers (for example `X-Forwarded-For`), you can use the `x-headers-delete` header. For example, if you want to remove the `X-Forwarded-For` header, you can set the `x-headers-delete` header to `X-Forwarded-For`.
+
+You can also use the environment variable `HEADERS_TO_DELETE` to remove specific headers, or both.
+
+In both cases, if you need to remove multiple headers, you can use a comma-separated list.
+
+So for example :
+
+```shell
+docker run -d --name simple-cors-proxy  -p 8080:8080 -e HEADERS_TO_DELETE=X-Forwarded-For,X-Forwarded-Host obeoneorg/simple-cors-proxy
+```
 
 ## 🤝 Contributing
 
