@@ -12,6 +12,26 @@ app.use(bodyParser.json());
 // Use morgan for logging incoming requests with added color for better readability
 app.use(morgan(chalk.blue(':method') + ' ' + chalk.green(':url') + ' ' + chalk.yellow(':status') + ' ' + chalk.magenta(':response-time ms')));
 
+// Middleware to delete headers from the request
+const deleteHeadersMiddleware = (req, res, next) => {
+    'use strict';
+
+    const { headers } = req;
+    const headersToDelete = new Set([
+        ...(headers['x-headers-delete'] || '').split(',').map(header => header.trim()),
+        ...(process.env.HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
+    ]);
+
+    headersToDelete.forEach(header => {
+        delete headers[header.toLowerCase()];
+    });
+
+    delete headers['x-headers-delete'];
+
+    next();
+};
+
+
 // Configuration for the proxy middleware
 const corsProxyOptions = {
     target: 'https://localhost:3000', // The target host (replaced by the X-Url-Destination header in router)
@@ -69,6 +89,9 @@ const corsProxyOptions = {
     },
     
 };
+
+// Apply the middleware to delete headers
+app.use(deleteHeadersMiddleware);
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
