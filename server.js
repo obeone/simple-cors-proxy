@@ -31,10 +31,27 @@ const deleteHeadersMiddleware = (req, res, next) => {
     next();
 };
 
+// Middleware to check an optional API key
+const checkApiKeyMiddleware = (req, res, next) => {
+    'use strict';
+
+    const { headers } = req;
+    if (process.env.PROXY_TOKEN) {
+        if (req.headers['x-proxy-token'] !== process.env.PROXY_TOKEN) {
+            res.sendStatus(401);
+            return;
+        } else {
+            delete headers['x-proxy-token'];
+        }
+    }
+
+    next();
+}
+
 
 // Configuration for the proxy middleware
 const corsProxyOptions = {
-    target: 'https://localhost:3000', // The target host (replaced by the X-Url-Destination header in router)
+    target: 'http://host_to_be_superseeded_by_router', // The target host (replaced by the X-Url-Destination header in router)
     changeOrigin: true,
     logLevel: 'debug', // Enable verbose logging for the proxy
     router: (req) => {
@@ -90,8 +107,6 @@ const corsProxyOptions = {
     
 };
 
-// Apply the middleware to delete headers
-app.use(deleteHeadersMiddleware);
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
@@ -102,6 +117,11 @@ app.options('/proxy', (req, res) => {
     res.header('Access-Control-Max-Age', '86400'); // 24 hours
     res.sendStatus(200);
 });
+
+// Apply the middleware to delete headers
+app.use(deleteHeadersMiddleware);
+// Apply the middleware to check an optional API key
+app.use(checkApiKeyMiddleware);
 
 // Apply the CORS proxy middleware to the path '/proxy'
 app.use('/proxy', createProxyMiddleware(corsProxyOptions));

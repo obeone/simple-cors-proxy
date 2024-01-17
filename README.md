@@ -1,6 +1,6 @@
 # 🐳 Docker Simple CORS Proxy
 
-🐳 [Docker Image](https://hub.docker.com/r/obeoneorg/simple-cors-proxy) | 🔗 [TypingMind Plugin](https://cloud.typingmind.com/plugins/p-01HKBS6JY387AW48VJQ3JR50A2)
+🐳 [Docker Image](https://hub.docker.com/r/obeoneorg/simple-cors-proxy) | 🔗 [TypingMind Plugin](https://cloud.typingmind.com/plugins/p-01HMARRCP06S0B7Y6HRX1F9R0P)
 
 This is a simple CORS proxy server designed to work with the TypingMind plugin. It allows you to make cross-origin requests to any API without worrying about CORS restrictions.
 
@@ -15,7 +15,7 @@ This is a simple CORS proxy server designed to work with the TypingMind plugin. 
 
 The TypingMind plugin is a powerful tool that enhances the capabilities of GPT. With the TypingMind plugin, GPT can seamlessly make calls to any API without being restricted by CORS (Cross-Origin Resource Sharing) policies. This allows GPT to access external data sources and services, opening up a wide range of possibilities for integration and interaction.
 
-To use the TypingMind plugin, simply install go to the [TypingMind Plugin page](https://cloud.typingmind.com/plugins/p-01HKBS6JY387AW48VJQ3JR50A2) and click on Import.
+To use the TypingMind plugin, simply install go to the [TypingMind Plugin page](https://cloud.typingmind.com/plugins/p-01HMARRCP06S0B7Y6HRX1F9R0P) and click on Import.
 
 ## 🐳 Docker
 
@@ -69,6 +69,22 @@ npm start
 4. The server will be running on port 8080 by default. You can change the port by setting the `PORT` environment variable.
 
 ### Advanced Usage
+
+#### Authentication
+
+If you need to authenticate access to the proxy server, you can use the `PROXY_TOKEN` environment variable. You set the `PROXY_TOKEN` environment variable to the value of your API key, and the proxy server will check the API key in the `X-Proxy-Token` header.
+
+Example :
+
+```shell
+docker run -d --name simple-cors-proxy  -p 8080:8080 -e PROXY_TOKEN=YOUR_API_KEY obeoneorg/simple-cors-proxy
+```
+
+```shell
+curl -H "X-Proxy-Token: YOUR_API_KEY" -H "X-Url-Destination: http://example.com" http://localhost:8080/proxy
+```
+
+#### Headers Removal
 
 If you need to remove some headers (for example `X-Forwarded-For`), you can use the `x-headers-delete` header. For example, if you want to remove the `X-Forwarded-For` header, you can set the `x-headers-delete` header to `X-Forwarded-For`.
 
