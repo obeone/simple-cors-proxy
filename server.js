@@ -31,6 +31,23 @@ const deleteHeadersMiddleware = (req, res, next) => {
     next();
 };
 
+// Middleware to check an optional API key
+const checkApiKeyMiddleware = (req, res, next) => {
+    'use strict';
+
+    const { headers } = req;
+    if (process.env.PROXY_TOKEN) {
+        if (req.headers['x-proxy-token'] !== process.env.PROXY_TOKEN) {
+            res.sendStatus(401);
+            return;
+        } else {
+            delete headers['x-proxy-token'];
+        }
+    }
+
+    next();
+}
+
 
 // Configuration for the proxy middleware
 const corsProxyOptions = {
@@ -92,6 +109,8 @@ const corsProxyOptions = {
 
 // Apply the middleware to delete headers
 app.use(deleteHeadersMiddleware);
+// Apply the middleware to check an optional API key
+app.use(checkApiKeyMiddleware);
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
