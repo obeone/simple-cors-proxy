@@ -107,10 +107,6 @@ const corsProxyOptions = {
     
 };
 
-// Apply the middleware to delete headers
-app.use(deleteHeadersMiddleware);
-// Apply the middleware to check an optional API key
-app.use(checkApiKeyMiddleware);
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
@@ -121,6 +117,11 @@ app.options('/proxy', (req, res) => {
     res.header('Access-Control-Max-Age', '86400'); // 24 hours
     res.sendStatus(200);
 });
+
+// Apply the middleware to delete headers
+app.use(deleteHeadersMiddleware);
+// Apply the middleware to check an optional API key
+app.use(checkApiKeyMiddleware);
 
 // Apply the CORS proxy middleware to the path '/proxy'
 app.use('/proxy', createProxyMiddleware(corsProxyOptions));
