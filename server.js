@@ -34,7 +34,7 @@ const deleteHeadersMiddleware = (req, res, next) => {
 
 // Configuration for the proxy middleware
 const corsProxyOptions = {
-    target: 'https://localhost:3000', // The target host (replaced by the X-Url-Destination header in router)
+    target: 'http://host_to_be_superseeded_by_router', // The target host (replaced by the X-Url-Destination header in router)
     changeOrigin: true,
     logLevel: 'debug', // Enable verbose logging for the proxy
     router: (req) => {
