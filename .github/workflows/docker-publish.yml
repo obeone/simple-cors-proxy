@@ -72,7 +72,7 @@ jobs:
         with:
           images: 
             ghcr.io/obeone/${{ env.IMAGE_NAME }}
-            ${{ env.REGISTRY }}/{{ env.REGISTRY_USER }}/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_USER }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
