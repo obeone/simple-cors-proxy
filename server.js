@@ -52,14 +52,22 @@ const deleteRequestHeadersMiddleware = (req, res, next) => {
  * It checks for headers-to-delete-response specified in the response itself or environment variables.
  */
 const deleteResponseHeadersMiddleware = (req, res, next) => {
+    // Store original res.removeHeader to maintain compatibility
+    const originalRemoveHeader = res.removeHeader.bind(res);
+
     res.on('finish', () => {
         const responseHeadersToDelete = new Set([
             ...(res.getHeader('headers-to-delete-response') || '').split(',').map(header => header.trim()),
             ...(process.env.RESPONSE_HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
         ]);
 
+        // Ensure we only attempt to remove headers if they exist
         responseHeadersToDelete.forEach(header => {
-            res.removeHeader(header);
+            if (res.headersSent) {
+                console.warn(chalk.yellow(`Headers already sent, unable to remove: `, header));
+                return; // Exit if headers are already sent
+            }
+            originalRemoveHeader(header);
         });
     });
     next();
@@ -115,15 +123,20 @@ const corsProxyOptions = {
         console.debug(chalk.green('Received response with status:'), chalk.greenBright(proxyRes.statusCode));
         console.debug(chalk.green('Original response headers:'), proxyRes.headers);
 
-        // Add CORS headers to the response
-        proxyRes.headers['Access-Control-Allow-Origin'] = req.headers['origin'] || '*';
-        proxyRes.headers['Access-Control-Allow-Methods'] = req.headers['access-control-request-method'] || 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
-        proxyRes.headers['Access-Control-Allow-Headers'] = req.headers['access-control-request-headers'] || 'Origin, Content-Type, Accept, Authorization';
-        
+        // Add CORS headers to the response if not already sent
+        if (!res.headersSent) {
+            res.setHeader('Access-Control-Allow-Origin', req.headers['origin'] || '*');
+            res.setHeader('Access-Control-Allow-Methods', req.headers['access-control-request-method'] || 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Origin, Content-Type, Accept, Authorization');
+        }
+
         console.debug(chalk.green('Modified response headers:'), proxyRes.headers);
     },
     onError: (err, req, res) => {
         console.error(chalk.red('Proxy encountered an error:'), err);
+        if (!res.headersSent) {
+            res.sendStatus(500); // Internal Server Error
+        }
     },
 };
 
