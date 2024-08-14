@@ -1,5 +1,3 @@
-/Users/obeone/Documents/geek/github/simple-cors-proxy/server.js
-
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const bodyParser = require('body-parser');
@@ -32,13 +30,11 @@ const urlParamsToHeadersMiddleware = (req, res, next) => {
  * It checks for headers-to-delete specified in the request itself, query parameters, or environment variables.
  */
 const deleteRequestHeadersMiddleware = (req, res, next) => {
-    'use strict';
-
     const { headers } = req;
     const requestHeadersToDelete = new Set([
         ...(headers['headers-to-delete'] || headers['x-headers-delete'] || '').split(',').map(header => header.trim()),
         ...(req.query['headers-delete'] || '').split(',').map(header => header.trim()), // Add query string support
-        ...(process.env.HEADERS_TO_DELETE || process.env.REQUEST_HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
+        ...(process.env.HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
     ]);
 
     requestHeadersToDelete.forEach(header => {
@@ -74,8 +70,6 @@ const deleteResponseHeadersMiddleware = (req, res, next) => {
  * It looks for an API key (`token`) in query parameters or headers and compares it with the expected token.
  */
 const checkApiKeyMiddleware = (req, res, next) => {
-    'use strict';
-
     const token = req.query.token || req.headers['x-proxy-token'];
     if (process.env.PROXY_TOKEN && token !== process.env.PROXY_TOKEN) {
         res.sendStatus(401); // Unauthorized
@@ -83,7 +77,7 @@ const checkApiKeyMiddleware = (req, res, next) => {
     }
 
     next();
-}
+};
 
 /**
  * Configuration for the proxy middleware, defining behavior when proxying requests.
@@ -146,17 +140,14 @@ app.options('/proxy', (req, res) => {
 // Register middlewares for query parameter handling, API key checking, and proxying
 app.use('/proxy', urlParamsToHeadersMiddleware);
 app.use(checkApiKeyMiddleware);
+app.use(deleteRequestHeadersMiddleware); // Ensure this is in use
+app.use(deleteResponseHeadersMiddleware); // Ensure this is in use
 
 // Setup the proxy middleware
 app.use('/proxy', createProxyMiddleware(corsProxyOptions));
-
-// Apply middlewares to delete headers from request and response
-app.use(deleteRequestHeadersMiddleware);
-app.use(deleteResponseHeadersMiddleware);
 
 // Start the server with a success message logging
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(chalk.green(`Server is running on port ${PORT}`));
 });
-
