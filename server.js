@@ -12,6 +12,18 @@ app.use(bodyParser.json());
 // Use morgan for logging incoming requests with added color for better readability
 app.use(morgan(chalk.blue(':method') + ' ' + chalk.green(':url') + ' ' + chalk.yellow(':status') + ' ' + chalk.magenta(':response-time ms')));
 
+// Middleware to parse URL parameters and add them to headers
+const urlParamsToHeadersMiddleware = (req, res, next) => {
+    // Iterate over query parameters and add them to headers
+    for (const [key, value] of Object.entries(req.query)) {
+        // Skip the special 'url' and 'token' query parameters
+        if (key.toLowerCase() !== 'url' && key.toLowerCase() !== 'token') {
+            req.headers[key.toLowerCase()] = value;
+        }
+    }
+    next();
+};
+
 // Middleware to delete headers from the request
 const deleteRequestHeadersMiddleware = (req, res, next) => {
     'use strict';
@@ -19,6 +31,7 @@ const deleteRequestHeadersMiddleware = (req, res, next) => {
     const { headers } = req;
     const requestHeadersToDelete = new Set([
         ...(headers['headers-to-delete'] || headers['x-headers-delete'] || '').split(',').map(header => header.trim()),
+        ...(req.query['headers-delete'] || '').split(',').map(header => header.trim()), // Add query string support
         ...(process.env.HEADERS_TO_DELETE || process.env.REQUEST_HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
     ]);
 
@@ -28,7 +41,6 @@ const deleteRequestHeadersMiddleware = (req, res, next) => {
 
     delete headers['headers-to-delete'];
     delete headers['x-headers-delete']; // Kept for compatibility
-    
 
     next();
 };
@@ -48,6 +60,7 @@ const deleteResponseHeadersMiddleware = (req, res, next) => {
     next();
 };
 
+// Middleware to check an optional API key
 const checkApiKeyMiddleware = (req, res, next) => {
     'use strict';
 
@@ -59,7 +72,6 @@ const checkApiKeyMiddleware = (req, res, next) => {
 
     next();
 }
-
 
 // Configuration for the proxy middleware
 const corsProxyOptions = {
@@ -116,9 +128,7 @@ const corsProxyOptions = {
         // Log any errors encountered by the proxy
         console.error(chalk.red('Proxy encountered an error:'), err);
     },
-    
 };
-
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
@@ -130,24 +140,22 @@ app.options('/proxy', (req, res) => {
     res.sendStatus(200);
 });
 
-// Apply the middleware to check an optional API key
+// Apply middleware to handle query parameters for headers
+app.use('/proxy', urlParamsToHeadersMiddleware);
+
+// Apply middleware to check an optional API key
 app.use(checkApiKeyMiddleware);
 
 // Apply the CORS proxy middleware to the path '/proxy'
 app.use('/proxy', createProxyMiddleware(corsProxyOptions));
-
 
 // Apply the middleware to delete request headers
 app.use(deleteRequestHeadersMiddleware);
 // Apply the middleware to delete response headers
 app.use(deleteResponseHeadersMiddleware);
 
-// Add a debug message
-
-
 // Start the server with user-friendly logging
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(chalk.green(`Server is running on port ${PORT}`));
 });
-
