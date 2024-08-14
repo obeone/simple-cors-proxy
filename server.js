@@ -13,36 +13,48 @@ app.use(bodyParser.json());
 app.use(morgan(chalk.blue(':method') + ' ' + chalk.green(':url') + ' ' + chalk.yellow(':status') + ' ' + chalk.magenta(':response-time ms')));
 
 // Middleware to delete headers from the request
-const deleteHeadersMiddleware = (req, res, next) => {
+const deleteRequestHeadersMiddleware = (req, res, next) => {
     'use strict';
 
     const { headers } = req;
-    const headersToDelete = new Set([
-        ...(headers['x-headers-delete'] || '').split(',').map(header => header.trim()),
-        ...(process.env.HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
+    const requestHeadersToDelete = new Set([
+        ...(headers['headers-to-delete'] || headers['x-headers-delete'] || '').split(',').map(header => header.trim()),
+        ...(process.env.HEADERS_TO_DELETE || process.env.REQUEST_HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
     ]);
 
-    headersToDelete.forEach(header => {
+    requestHeadersToDelete.forEach(header => {
         delete headers[header.toLowerCase()];
     });
 
-    delete headers['x-headers-delete'];
+    delete headers['headers-to-delete'];
+    delete headers['x-headers-delete']; // Kept for compatibility
+    
 
     next();
 };
 
-// Middleware to check an optional API key
+// Middleware to delete headers from the response
+const deleteResponseHeadersMiddleware = (req, res, next) => {
+    res.on('finish', () => {
+        const responseHeadersToDelete = new Set([
+            ...(res.getHeader('headers-to-delete-response') || '').split(',').map(header => header.trim()),
+            ...(process.env.RESPONSE_HEADERS_TO_DELETE || '').split(',').map(header => header.trim())
+        ]);
+
+        responseHeadersToDelete.forEach(header => {
+            res.removeHeader(header);
+        });
+    });
+    next();
+};
+
 const checkApiKeyMiddleware = (req, res, next) => {
     'use strict';
 
-    const { headers } = req;
-    if (process.env.PROXY_TOKEN) {
-        if (req.headers['x-proxy-token'] !== process.env.PROXY_TOKEN) {
-            res.sendStatus(401);
-            return;
-        } else {
-            delete headers['x-proxy-token'];
-        }
+    const token = req.query.token || req.headers['x-proxy-token'];
+    if (process.env.PROXY_TOKEN && token !== process.env.PROXY_TOKEN) {
+        res.sendStatus(401);
+        return;
     }
 
     next();
@@ -56,22 +68,22 @@ const corsProxyOptions = {
     logLevel: 'debug', // Enable verbose logging for the proxy
     router: (req) => {
         // Check if the request has a specific destination URL
-        if (req.headers['x-url-destination']) {
-            const url = new URL(req.headers['x-url-destination']);
-            console.debug(chalk.cyan('Proxying request to host :'), chalk.cyanBright(url.origin));
-            return url.origin;
+        const url = req.query.url || req.headers['x-url-destination'];
+        if (url) {
+            console.debug(chalk.cyan('Proxying request to host :'), chalk.cyanBright(new URL(url).origin));
+            return new URL(url).origin;
         }
         else {
-            // Log and throw an error if the X-Url-Destination header is not found
-            console.debug(chalk.red('No X-Url-Destination header found'));
-            throw new Error('You need to set the X-url-destination header');
+            // Log and throw an error if the URL is not found
+            console.debug(chalk.red('No URL found in query parameter or X-Url-Destination header'));
+            throw new Error('You need to provide the URL as a query parameter or set the X-url-destination header');
         }
     },
     pathRewrite: function (path, req) { 
-        // Take the full URL in req['x-url-destination'], and return only the path part
-        const url = new URL(req.headers['x-url-destination']);
-        console.debug(chalk.cyan('Proxying request to path :'), chalk.cyanBright(url.pathname + url.search));
-        return url.pathname + url.search;
+        // Take the full URL in req.query.url or req['x-url-destination'], and return only the path part
+        const url = req.query.url || req.headers['x-url-destination'];
+        console.debug(chalk.cyan('Proxying request to path :'), chalk.cyanBright(new URL(url).pathname + new URL(url).search));
+        return new URL(url).pathname + new URL(url).search;
     },
     onProxyReq: (proxyReq, req, res) => {
         // Log the proxying of the request and the original request headers
@@ -118,13 +130,20 @@ app.options('/proxy', (req, res) => {
     res.sendStatus(200);
 });
 
-// Apply the middleware to delete headers
-app.use(deleteHeadersMiddleware);
 // Apply the middleware to check an optional API key
 app.use(checkApiKeyMiddleware);
 
 // Apply the CORS proxy middleware to the path '/proxy'
 app.use('/proxy', createProxyMiddleware(corsProxyOptions));
+
+
+// Apply the middleware to delete request headers
+app.use(deleteRequestHeadersMiddleware);
+// Apply the middleware to delete response headers
+app.use(deleteResponseHeadersMiddleware);
+
+// Add a debug message
+
 
 // Start the server with user-friendly logging
 const PORT = process.env.PORT || 8080;
