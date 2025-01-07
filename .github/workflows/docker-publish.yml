@@ -113,6 +113,6 @@ jobs:
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
           repository: ${{ env.REGISTRY_USER }}/${{ env.IMAGE_NAME }}
