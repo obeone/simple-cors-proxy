@@ -1,3 +1,4 @@
+// keywords: express pass param to proxy createProxyMiddleware x-url-destination
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const bodyParser = require('body-parser');
@@ -46,8 +47,7 @@ const checkApiKeyMiddleware = (req, res, next) => {
     }
 
     next();
-}
-
+};
 
 // Configuration for the proxy middleware
 const corsProxyOptions = {
@@ -60,14 +60,13 @@ const corsProxyOptions = {
             const url = new URL(req.headers['x-url-destination']);
             console.debug(chalk.cyan('Proxying request to host :'), chalk.cyanBright(url.origin));
             return url.origin;
-        }
-        else {
+        } else {
             // Log and throw an error if the X-Url-Destination header is not found
             console.debug(chalk.red('No X-Url-Destination header found'));
             throw new Error('You need to set the X-url-destination header');
         }
     },
-    pathRewrite: function (path, req) { 
+    pathRewrite: function (path, req) {
         // Take the full URL in req['x-url-destination'], and return only the path part
         const url = new URL(req.headers['x-url-destination']);
         console.debug(chalk.cyan('Proxying request to path :'), chalk.cyanBright(url.pathname + url.search));
@@ -83,7 +82,7 @@ const corsProxyOptions = {
         proxyReq.removeHeader('x-forwarded-proto');
         proxyReq.removeHeader('x-forwarded-for');
         proxyReq.removeHeader('x-url-destination');
-        
+
         // Log the modified request headers
         console.debug(chalk.cyan('Modified request headers:'), proxyReq.getHeaders());
     },
@@ -96,7 +95,7 @@ const corsProxyOptions = {
         proxyRes.headers['Access-Control-Allow-Origin'] = req.headers['origin'] || '*';
         proxyRes.headers['Access-Control-Allow-Methods'] = req.headers['access-control-request-method'] || 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
         proxyRes.headers['Access-Control-Allow-Headers'] = req.headers['access-control-request-headers'] || 'Origin, Content-Type, Accept, Authorization';
-        
+
         // Log the modified response headers
         console.debug(chalk.green('Modified response headers:'), proxyRes.headers);
     },
@@ -104,9 +103,7 @@ const corsProxyOptions = {
         // Log any errors encountered by the proxy
         console.error(chalk.red('Proxy encountered an error:'), err);
     },
-    
 };
-
 
 // Handle OPTIONS requests directly with user-friendly logging
 app.options('/proxy', (req, res) => {
@@ -123,12 +120,30 @@ app.use(deleteHeadersMiddleware);
 // Apply the middleware to check an optional API key
 app.use(checkApiKeyMiddleware);
 
-// Apply the CORS proxy middleware to the path '/proxy'
-app.use('/proxy', createProxyMiddleware(corsProxyOptions));
+/**
+ * Intercept the entire URL provided after "/proxy/".
+ * Using `req.originalUrl` preserves query parameters if present.
+ * Example: GET /proxy/https://example.com/some/path?foo=1 => everything after "/proxy/" is preserved.
+ */
+app.use('/proxy', (req, res, next) => {
+    const prefix = '/proxy/';
+
+    // If the originalUrl starts with /proxy/ and has more content
+    if (req.originalUrl.startsWith(prefix) && req.originalUrl.length > prefix.length) {
+        // Remove "/proxy/" from the beginning of the string
+        const encodedUrl = req.originalUrl.substring(prefix.length);
+
+        // Decode the entire string in case it was URL-encoded
+        const decodedUrl = decodeURIComponent(encodedUrl);
+
+        // Set the X-Url-Destination header to the full decoded URL (including any query params)
+        req.headers['x-url-destination'] = decodedUrl;
+    }
+    next();
+}, createProxyMiddleware(corsProxyOptions));
 
 // Start the server with user-friendly logging
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(chalk.green(`Server is running on port ${PORT}`));
 });
-

@@ -4,9 +4,13 @@
 
 This is a simple CORS proxy server designed to work with the TypingMind plugin. It allows you to make cross-origin requests to any API without worrying about CORS restrictions.
 
+But it's not limited to TypingMind. You can use it with any application that requires a CORS proxy!
+
 ## 🚀 Features
 
 - 🌐 Seamless integration with external APIs using the TypingMind plugin
+- 🔒 Secure authentication using an API key
+- 🔗 Ability to proxy requests to any URL using the `X-Url-Destination` header or directly in the URL path
 - 🔄 Handles CORS headers to enable cross-origin requests
 - ⚙️ Easy setup and configuration
 - 🐳 Docker image available for quick deployment
@@ -81,6 +85,18 @@ curl -H "X-Url-Destination: http://example.com" http://localhost:8080/proxy
 ```
 
 ### Advanced Usage
+
+#### Passing URLs Directly
+
+You can now pass the entire URL directly after `/proxy/` in your request. This method preserves any query parameters that might be present in the URL.
+
+Example:
+
+```shell
+curl http://localhost:8080/proxy/https://example.com/some/path?foo=1
+```
+
+By using this approach, the server automatically sets the `X-Url-Destination` header to the full decoded URL, making it easier and more intuitive to use the proxy.
 
 #### Authentication
 
