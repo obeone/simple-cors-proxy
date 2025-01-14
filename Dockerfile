@@ -1,5 +1,5 @@
 # Use an official lightweight Node.js image as a parent image
-FROM node:21.5.0-slim
+FROM node:23.6.0-slim
 
 # Needed folder to run the app
 RUN mkdir /nonexistent && \
