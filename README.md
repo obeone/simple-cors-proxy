@@ -44,7 +44,7 @@ docker compose up -d
 ```
 
 
-## 💻 Usage
+## 💻 Manual Installation
 
 To use this proxy server without Docker, follow these steps:
 
@@ -67,6 +67,18 @@ npm start
 ```
 
 4. The server will be running on port 8080 by default. You can change the port by setting the `PORT` environment variable.
+
+## 📝 Usage
+
+### Basic Usage
+
+To use the proxy server, you need to send a request with the `X-Url-Destination` header set to the URL of the resource you want to access.
+
+Example:
+
+```shell
+curl -H "X-Url-Destination: http://example.com" http://localhost:8080/proxy
+```
 
 ### Advanced Usage
 
