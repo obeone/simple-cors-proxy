@@ -1,14 +1,13 @@
 // keywords: express pass param to proxy createProxyMiddleware x-url-destination
-const express = require('express');
-const { createProxyMiddleware } = require('http-proxy-middleware');
-const bodyParser = require('body-parser');
-const morgan = require('morgan'); // Middleware for logging HTTP requests
-const chalk = require('chalk'); // Module to add colors to console output
+import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import morgan from 'morgan'; // Middleware for logging HTTP requests
+import chalk from 'chalk'; // Module to add colors to console output
 
 const app = express();
 
-// Parse application/json content-type
-app.use(bodyParser.json());
+// Parse application/json content-type (body-parser is bundled into express 5)
+app.use(express.json());
 
 // Use morgan for logging incoming requests with added color for better readability
 app.use(morgan(chalk.blue(':method') + ' ' + chalk.green(':url') + ' ' + chalk.yellow(':status') + ' ' + chalk.magenta(':response-time ms')));
@@ -53,7 +52,7 @@ const checkApiKeyMiddleware = (req, res, next) => {
 const corsProxyOptions = {
     target: 'http://host_to_be_superseeded_by_router', // The target host (replaced by the X-Url-Destination header in router)
     changeOrigin: true,
-    logLevel: 'debug', // Enable verbose logging for the proxy
+    logger: console, // Enable verbose logging for the proxy
     router: (req) => {
         // Check if the request has a specific destination URL
         if (req.headers['x-url-destination']) {
@@ -72,36 +71,40 @@ const corsProxyOptions = {
         console.debug(chalk.cyan('Proxying request to path :'), chalk.cyanBright(url.pathname + url.search));
         return url.pathname + url.search;
     },
-    onProxyReq: (proxyReq, req, res) => {
-        // Log the proxying of the request and the original request headers
-        console.debug(chalk.cyan('Proxying request to:'), chalk.cyanBright(req.url));
-        console.debug(chalk.cyan('Original request headers:'), req.headers);
+    // Since v3, event handlers live under the `on` key instead of being
+    // top-level `onProxyReq` / `onProxyRes` / `onError` options.
+    on: {
+        proxyReq: (proxyReq, req, res) => {
+            // Log the proxying of the request and the original request headers
+            console.debug(chalk.cyan('Proxying request to:'), chalk.cyanBright(req.url));
+            console.debug(chalk.cyan('Original request headers:'), req.headers);
 
-        // Remove specific headers from the proxy request
-        proxyReq.removeHeader('x-forwarded-host');
-        proxyReq.removeHeader('x-forwarded-proto');
-        proxyReq.removeHeader('x-forwarded-for');
-        proxyReq.removeHeader('x-url-destination');
+            // Remove specific headers from the proxy request
+            proxyReq.removeHeader('x-forwarded-host');
+            proxyReq.removeHeader('x-forwarded-proto');
+            proxyReq.removeHeader('x-forwarded-for');
+            proxyReq.removeHeader('x-url-destination');
 
-        // Log the modified request headers
-        console.debug(chalk.cyan('Modified request headers:'), proxyReq.getHeaders());
-    },
-    onProxyRes: (proxyRes, req, res) => {
-        // Log the received response status and original response headers
-        console.debug(chalk.green('Received response with status:'), chalk.greenBright(proxyRes.statusCode));
-        console.debug(chalk.green('Original response headers:'), proxyRes.headers);
+            // Log the modified request headers
+            console.debug(chalk.cyan('Modified request headers:'), proxyReq.getHeaders());
+        },
+        proxyRes: (proxyRes, req, res) => {
+            // Log the received response status and original response headers
+            console.debug(chalk.green('Received response with status:'), chalk.greenBright(proxyRes.statusCode));
+            console.debug(chalk.green('Original response headers:'), proxyRes.headers);
 
-        // Adjust response headers based on the original request
-        proxyRes.headers['Access-Control-Allow-Origin'] = req.headers['origin'] || '*';
-        proxyRes.headers['Access-Control-Allow-Methods'] = req.headers['access-control-request-method'] || 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
-        proxyRes.headers['Access-Control-Allow-Headers'] = req.headers['access-control-request-headers'] || 'Origin, Content-Type, Accept, Authorization';
+            // Adjust response headers based on the original request
+            proxyRes.headers['Access-Control-Allow-Origin'] = req.headers['origin'] || '*';
+            proxyRes.headers['Access-Control-Allow-Methods'] = req.headers['access-control-request-method'] || 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
+            proxyRes.headers['Access-Control-Allow-Headers'] = req.headers['access-control-request-headers'] || 'Origin, Content-Type, Accept, Authorization';
 
-        // Log the modified response headers
-        console.debug(chalk.green('Modified response headers:'), proxyRes.headers);
-    },
-    onError: (err, req, res) => {
-        // Log any errors encountered by the proxy
-        console.error(chalk.red('Proxy encountered an error:'), err);
+            // Log the modified response headers
+            console.debug(chalk.green('Modified response headers:'), proxyRes.headers);
+        },
+        error: (err, req, res) => {
+            // Log any errors encountered by the proxy
+            console.error(chalk.red('Proxy encountered an error:'), err);
+        },
     },
 };
 
