@@ -1,16 +1,30 @@
 name: Dependabot auto-merge
 
+# Merges Dependabot patch/minor updates once every other check on the PR head
+# has passed. The wait happens here, in the job, because this repo has no
+# required status checks (and private repos on the free plan cannot have any),
+# so GitHub's native auto-merge cannot be relied on to gate on CI.
+
 on:
   pull_request:
 
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  statuses: read
+
+concurrency:
+  # One run per PR: a rebase by Dependabot cancels the run still waiting on
+  # the previous head commit.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
+    timeout-minutes: 60
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
@@ -20,13 +34,93 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve and enable auto-merge for patch/minor updates
+      - name: Wait for the other checks to pass
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # Check-run name of this job, excluded so it does not wait on itself.
+          SELF: auto-merge
         run: |
-          gh pr review --approve "$PR_URL"
-          gh pr merge --auto --squash "$PR_URL"
+          # Fail closed: an API error inside a pipeline must stop the job
+          # rather than read as "no checks pending" and let the merge through.
+          set -o pipefail
+          # Give the other workflows time to register their check runs, so an
+          # empty list right after the push is not mistaken for "no CI".
+          sleep 30
+          deadline=$((SECONDS + 50 * 60))
+          while :; do
+            # Default filter=latest keeps only the newest attempt of each check.
+            runs=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+              --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv' \
+              | awk -F '\t' -v self="$SELF" '$1 != self')
+            # Comma-separated names, empty when nothing matches.
+            failed=$(printf '%s\n' "$runs" | awk -F '\t' \
+              '$2 == "completed" && $3 != "success" && $3 != "skipped" && $3 != "neutral" {print $1 " (" $3 ")"}' \
+              | paste -sd ',' -)
+            pending=$(printf '%s\n' "$runs" | awk -F '\t' 'NF && $2 != "completed" {print $1}' \
+              | paste -sd ',' -)
+
+            # Commit statuses come from external services. The combined state
+            # reads "pending" when there are none at all, so count them first.
+            read -r status_count status_state < <(gh api "repos/$REPO/commits/$SHA/status" \
+              --jq '"\(.total_count) \(.state)"')
+            # Process substitution hides gh's exit code, so validate the output.
+            if ! [[ "$status_count" =~ ^[0-9]+$ ]]; then
+              echo "::error::Could not read commit statuses for $SHA"
+              exit 1
+            fi
+            if [ "$status_count" != "0" ]; then
+              case "$status_state" in
+                failure | error) failed="${failed:+$failed,}commit-status" ;;
+                pending) pending="${pending:+$pending,}commit-status" ;;
+              esac
+            fi
+
+            if [ -n "$failed" ]; then
+              echo "::error::Not merging, failed checks: $failed"
+              exit 1
+            fi
+            if [ -z "$pending" ]; then
+              echo "All other checks passed."
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Not merging, checks still pending: $pending"
+              exit 1
+            fi
+            echo "Waiting on: $pending"
+            sleep 30
+          done
+
+      - name: Approve and merge
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Approval needs "Allow GitHub Actions to create and approve pull
+          # requests" in repo settings; it is not required to merge here.
+          gh pr review --approve "$PR_URL" \
+            || echo "::warning::Could not approve $PR_URL (Actions approval disabled in repo settings?)"
+
+          # Plain merge, not --auto: without branch protection, --auto fails
+          # whenever the PR is not immediately mergeable. Retry because
+          # mergeability reads UNKNOWN for a while after a sibling PR merges.
+          # --match-head-commit refuses to merge a head that changed since
+          # the checks above were verified.
+          for attempt in 1 2 3 4 5 6; do
+            if gh pr merge --squash --match-head-commit "$SHA" "$PR_URL"; then
+              exit 0
+            fi
+            echo "Merge attempt $attempt failed, retrying in 20s"
+            sleep 20
+          done
+          echo "::error::Could not merge $PR_URL (conflict? Dependabot will rebase it)"
+          exit 1
